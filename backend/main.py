@@ -1,20 +1,22 @@
-import io
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-import pandas as pd
 import uvicorn
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from utils import (
     ColumnMapper,
     LLMError,
     OpenAIClient,
+    ScriptRejected,
+    UploadError,
     clean_suggestion,
-    code_runner,
     get_column_info,
     init_db,
+    read_csv_upload,
+    run_script,
     settings,
 )
 
@@ -41,10 +43,11 @@ def get_suggester() -> ColumnMapper:
     return ColumnMapper(OpenAIClient(settings.openai_api_key, settings.openai_model), settings.store_prompts)
 
 
-def _read_csv(upload: UploadFile) -> pd.DataFrame:
-    if not (upload.filename or "").endswith(".csv"):
-        raise HTTPException(400, "Invalid file Type. Only .csv files are allowed.")
-    return pd.read_csv(io.StringIO(upload.file.read().decode("utf-8")))
+def _read(upload: UploadFile):
+    try:
+        return read_csv_upload(upload, settings.max_upload_bytes, settings.max_columns)
+    except UploadError as exc:
+        raise HTTPException(exc.status_code, exc.message) from None
 
 
 @app.get("/")
@@ -62,8 +65,8 @@ def column_suggestions(
     """Suggest how the input CSV's columns map onto the template CSV, plus a
     pandas script that performs the mapping. A `suggestion` (the user's edited
     mapping) asks for a revision that follows it."""
-    df_input = _read_csv(input_table)
-    df_template = _read_csv(template_table)
+    df_input, _ = _read(input_table)
+    df_template, _ = _read(template_table)
     revision = clean_suggestion(suggestion).strip() if suggestion else None
     try:
         return suggester.suggest(get_column_info(df_input), get_column_info(df_template), revision or None)
@@ -74,10 +77,14 @@ def column_suggestions(
 @app.post("/column_mapper/")
 def column_mapper(code: Annotated[str, Form()], input_table: Annotated[UploadFile, File()]):
     """Run the (possibly edited) mapping script on the input CSV and return the rows."""
-    response = code_runner(code, _read_csv(input_table))
-    if isinstance(response, pd.DataFrame):
-        response = response.to_dict(orient="records")
-    return response
+    _, csv_text = _read(input_table)
+    try:
+        result = run_script(code, csv_text, settings.script_timeout_seconds)
+    except ScriptRejected as exc:
+        return JSONResponse({"detail": exc.message, "line": exc.line}, status_code=422)
+    if result.error:
+        return JSONResponse({"detail": result.error, "line": result.line}, status_code=422)
+    return result.records
 
 
 if __name__ == "__main__":
