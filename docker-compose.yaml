@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  web:
+    image: <aws-account-id>.dkr.ecr.<region>.amazonaws.com/zero-test:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - data-volume:/app/data
+  frontend:
+    image: <aws-account-id>.dkr.ecr.<region>.amazonaws.com/zero-test-frontend:latest
+    ports:
+      - "80:80"
+
+volumes:
+  data-volume:
