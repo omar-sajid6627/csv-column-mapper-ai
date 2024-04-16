@@ -136,6 +136,8 @@ textarea {
 }
 
 textarea.code {
+  white-space: pre;
+  overflow-x: auto;
   background: var(--code-bg);
   color: var(--code-ink);
   border-color: var(--code-bg);

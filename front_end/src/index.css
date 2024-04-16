@@ -33,6 +33,11 @@ body {
   line-height: 1.5;
 }
 
+code,
+textarea {
+  font-variant-ligatures: none;
+}
+
 code {
   font-family: var(--font-mono);
   font-size: 0.9em;

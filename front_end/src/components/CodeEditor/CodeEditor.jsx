@@ -33,8 +33,9 @@ function CodeEditor({ code, setCode, file, setRows }) {
         value={code}
         onChange={(e) => setCode(e.target.value)}
         aria-describedby="script-hint"
-        placeholder="mapped_df = input_df"
+        placeholder="The generated script appears here after step 1."
         rows={12}
+        wrap="off"
         spellCheck={false}
       />
       <button type="submit" className="primary" disabled={!file || !code || loading} aria-busy={loading}>
