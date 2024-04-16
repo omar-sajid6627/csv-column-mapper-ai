@@ -1,10 +1,7 @@
 import { useState } from 'react';
-import { Alert, TextField } from '@mui/material';
-import LoadingButton from '@mui/lab/LoadingButton';
 import { errorMessage, mapCode } from '../../Apis';
-import './CodeEditor.css';
 
-function CodeEditor({ file, code, setCode, setOutputData }) {
+function CodeEditor({ code, setCode, file, setRows }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,36 +13,35 @@ function CodeEditor({ file, code, setCode, setOutputData }) {
     setLoading(true);
     setError('');
     mapCode(formData)
-      .then((res) => setOutputData(res.data))
+      .then((res) => setRows(res.data))
       .catch((err) => {
-        setOutputData([]);
+        setRows([]);
         setError(errorMessage(err));
       })
       .finally(() => setLoading(false));
   };
 
   return (
-    <div className="code-editor-container">
-      <TextField
+    <form className="editor" onSubmit={handleSubmit}>
+      <label htmlFor="script" className="visually-hidden">Mapping script</label>
+      <p className="hint" id="script-hint">
+        Python with <code>pd</code>, <code>np</code> and <code>datetime</code>; assign the result to <code>mapped_df</code>.
+      </p>
+      <textarea
+        id="script"
+        className="code"
         value={code}
         onChange={(e) => setCode(e.target.value)}
-        inputProps={{ 'aria-label': 'Mapping script' }}
-        multiline
-        rows={10}
-        variant="outlined"
-        fullWidth
+        aria-describedby="script-hint"
+        placeholder="mapped_df = input_df"
+        rows={12}
+        spellCheck={false}
       />
-      <LoadingButton
-        loading={loading}
-        loadingPosition="center"
-        variant="contained"
-        disabled={!file || !code}
-        onClick={handleSubmit}
-      >
-        Map
-      </LoadingButton>
-      {error && <Alert severity="error">{error}</Alert>}
-    </div>
+      <button type="submit" className="primary" disabled={!file || !code || loading} aria-busy={loading}>
+        {loading ? 'Running…' : 'Run script'}
+      </button>
+      {error && <p role="alert" className="error">{error}</p>}
+    </form>
   );
 }
 

@@ -1,10 +1,7 @@
 import { useState } from 'react';
-import { Alert, TextField } from '@mui/material';
-import LoadingButton from '@mui/lab/LoadingButton';
 import { errorMessage, updateSuggestions } from '../../Apis';
-import './Suggestions.css';
 
-function Suggestions({ setSuggestions, setCode, inputFile, templateFile, suggestions }) {
+function Suggestions({ suggestion, setSuggestion, setCode, inputFile, templateFile }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -13,12 +10,12 @@ function Suggestions({ setSuggestions, setCode, inputFile, templateFile, suggest
     const formData = new FormData();
     formData.append('input_table', inputFile);
     formData.append('template_table', templateFile);
-    formData.append('suggestion', suggestions);
+    formData.append('suggestion', suggestion);
     setLoading(true);
     setError('');
     updateSuggestions(formData)
       .then((res) => {
-        setSuggestions(res.data.suggestion);
+        setSuggestion(res.data.suggestion);
         setCode(res.data.code);
       })
       .catch((err) => setError(errorMessage(err)))
@@ -26,27 +23,25 @@ function Suggestions({ setSuggestions, setCode, inputFile, templateFile, suggest
   };
 
   return (
-    <div className="suggestions-container">
-      <TextField
-        value={suggestions}
-        onChange={(e) => setSuggestions(e.target.value)}
-        inputProps={{ 'aria-label': 'Suggested column mapping' }}
-        multiline
-        rows={10}
-        variant="outlined"
-        fullWidth
+    <form className="editor" onSubmit={handleSubmit}>
+      <label htmlFor="suggestion" className="visually-hidden">Suggested column mapping</label>
+      <p className="hint" id="suggestion-hint">
+        Edit the <code>source -&gt; target</code> lines, then ask for a script that follows them.
+      </p>
+      <textarea
+        id="suggestion"
+        value={suggestion}
+        onChange={(e) => setSuggestion(e.target.value)}
+        aria-describedby="suggestion-hint"
+        placeholder="The suggested mapping appears here after step 1."
+        rows={12}
+        spellCheck={false}
       />
-      <LoadingButton
-        loading={loading}
-        loadingPosition="center"
-        variant="contained"
-        disabled={!inputFile || !templateFile || !suggestions}
-        onClick={handleSubmit}
-      >
-        Update Suggestions
-      </LoadingButton>
-      {error && <Alert severity="error">{error}</Alert>}
-    </div>
+      <button type="submit" className="secondary" disabled={!inputFile || !templateFile || !suggestion || loading} aria-busy={loading}>
+        {loading ? 'Rewriting script…' : 'Rewrite script from this mapping'}
+      </button>
+      {error && <p role="alert" className="error">{error}</p>}
+    </form>
   );
 }
 
