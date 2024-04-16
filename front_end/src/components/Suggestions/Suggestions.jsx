@@ -1,24 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Alert, TextField } from '@mui/material';
 import LoadingButton from '@mui/lab/LoadingButton';
 import { errorMessage, updateSuggestions } from '../../Apis';
 import './Suggestions.css';
 
 function Suggestions({ setSuggestions, setCode, inputFile, templateFile, suggestions }) {
-  const [editedSuggestions, setEditedSuggestions] = useState(suggestions);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    setEditedSuggestions(suggestions);
-  }, [suggestions]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     const formData = new FormData();
     formData.append('input_table', inputFile);
     formData.append('template_table', templateFile);
-    formData.append('suggestion', editedSuggestions);
+    formData.append('suggestion', suggestions);
     setLoading(true);
     setError('');
     updateSuggestions(formData)
@@ -33,8 +28,8 @@ function Suggestions({ setSuggestions, setCode, inputFile, templateFile, suggest
   return (
     <div className="suggestions-container">
       <TextField
-        value={editedSuggestions}
-        onChange={(e) => setEditedSuggestions(e.target.value)}
+        value={suggestions}
+        onChange={(e) => setSuggestions(e.target.value)}
         inputProps={{ 'aria-label': 'Suggested column mapping' }}
         multiline
         rows={10}
@@ -45,7 +40,7 @@ function Suggestions({ setSuggestions, setCode, inputFile, templateFile, suggest
         loading={loading}
         loadingPosition="center"
         variant="contained"
-        disabled={!inputFile || !templateFile || !editedSuggestions}
+        disabled={!inputFile || !templateFile || !suggestions}
         onClick={handleSubmit}
       >
         Update Suggestions

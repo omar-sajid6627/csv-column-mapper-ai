@@ -1,4 +1,3 @@
-import React from 'react';
 import './UploadCSV.css';
 
 function UploadCSV({ setFile, label, id }) {

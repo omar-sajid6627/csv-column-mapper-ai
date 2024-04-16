@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Alert, Grid } from '@mui/material';
 import LoadingButton from '@mui/lab/LoadingButton';
 import Suggestions from './components/Suggestions/Suggestions';
@@ -67,7 +67,7 @@ function App() {
           </Grid>
           <Grid item xs={5}>
             <h2>Code Editor</h2>
-            <CodeEditor setOutputData={setOutputData} file={file} code={code} />
+            <CodeEditor setOutputData={setOutputData} file={file} code={code} setCode={setCode} />
           </Grid>
         </Grid>
         <Grid className="table-grid" item xs={12}>
