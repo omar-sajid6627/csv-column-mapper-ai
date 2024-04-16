@@ -1,111 +1,89 @@
-import os
-from langchain.chains import LLMChain 
-from langchain.llms import OpenAI
-from langchain.prompts import PromptTemplate
-from dotenv import load_dotenv
-from .models import create_llm_data
+"""Column-mapping suggestions: the prompt, the model call and the answer parsing."""
 
-load_dotenv()
+import re
+from typing import Protocol
+
+import pandas as pd
+
+from .models import create_llm_data
+from .templates import main_template, revision_template
+
+SAMPLE_SIZE = 5
+_FENCE = re.compile(r"^```[a-zA-Z]*\s*$", re.MULTILINE)
+
+
+class LLMError(RuntimeError):
+    """The model could not be reached or answered in an unusable shape."""
+
+
+class CompletionClient(Protocol):
+    def complete(self, prompt: str) -> str: ...
+
+
+class OpenAIClient:
+    def __init__(self, api_key: str, model: str):
+        from openai import OpenAI
+
+        self._client = OpenAI(api_key=api_key)
+        self._model = model
+
+    def complete(self, prompt: str) -> str:
+        from openai import OpenAIError
+
+        try:
+            reply = self._client.chat.completions.create(
+                model=self._model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=1500,
+            )
+        except OpenAIError as exc:
+            raise LLMError(f"OpenAI request failed: {exc.__class__.__name__}") from exc
+        content = reply.choices[0].message.content if reply.choices else None
+        if not content:
+            raise LLMError("OpenAI returned an empty answer")
+        return content
+
+
+def get_column_info(df: pd.DataFrame) -> list[dict]:
+    """Name, dtype and a few non-null sample values per column; columns that
+    duplicate an earlier column's values are left out to keep the prompt short."""
+    df = df.loc[:, ~df.T.duplicated(keep="first")]
+    return [
+        {
+            "column_name": str(col),
+            "data_type": str(df[col].dtype),
+            "sample_values": df[col].dropna().head(SAMPLE_SIZE).tolist(),
+        }
+        for col in df.columns
+    ]
+
+
+def parse_answer(answer: str) -> dict:
+    """Split the model's answer at "Code:" into suggestion text and a script."""
+    code_at = answer.find("Code:")
+    if code_at == -1:
+        raise LLMError("The model's answer has no 'Code:' section")
+    suggestion = answer[:code_at].strip()
+    code = _FENCE.sub("", answer[code_at + len("Code:") :]).strip()
+    if not code:
+        raise LLMError("The model's answer has an empty 'Code:' section")
+    return {"suggestion": suggestion, "code": code}
+
 
 class ColumnMapper:
-    """
-    Singleton class for suggesting column mappings using OpenAI's LLM.
-    
-    Attributes:
-        llm (OpenAI): Instance of the OpenAI's language model for performing tasks.
-    """
+    """Builds the prompt, asks the model and stores the exchange."""
 
-    _instance = None
-    
-    def __new__(cls):
-        """
-        Create a new instance or return the existing one for the ColumnMapper class.
-        """
-        if cls._instance is None:
-            try:
-                cls._instance = super(ColumnMapper, cls).__new__(cls)
-                
-                api_key = os.getenv('OPENAI_API_KEY')
-                if not api_key:
-                    raise ValueError("API key not found in .env file!")
-                
-                cls._instance.llm = OpenAI(model_name="gpt-3.5-turbo-instruct", temperature=0, max_tokens=1500,api_key=api_key)
-            except Exception as e:
-                print(f"Error initializing ColumnMapper: {e}")
-                return None  
-            
-        return cls._instance
+    def __init__(self, client: CompletionClient, store_prompts: bool = True):
+        self.client = client
+        self.store_prompts = store_prompts
 
-    @staticmethod
-    def get_column_info(df):
-        """
-        Extracts information from DataFrame's columns.
-        
-        Args:
-            df (DataFrame): Pandas DataFrame to extract column information from.
-        
-        Returns:
-            list: A list of dictionaries containing column names, data types, and sample values.
-        """
-
-        try:
-            df = df.loc[:, ~df.T.duplicated(keep='first')]
-            column_info_list = []
-            for col in df.columns:
-                column_info = {
-                    "column_name": col,
-                    "data_type": str(df[col].dtype),
-                    "sample_values": df[col].sample(5).tolist()
-                }
-                column_info_list.append(column_info)
-            return column_info_list
-        except Exception as e:
-            print(f"Error getting column info: {e}")
-            return []
-
-    def suggest_column_mapping(self, info_input, info_template,template,suggestion=None):
-        """
-        Suggests column mappings based on given input using OpenAI's LLM.
-        
-        Args:
-            info_input (dict): Information about the input data.
-            info_template (dict): Information about the template data.
-            template (str): The prompt template for the LLM.
-            suggestion (str, optional): Optional suggestion to aid the LLM. Defaults to None.
-        
-        Returns:
-            dict: Dictionary containing suggestions and code provided by the LLM.
-        """
-        try:
-            
-            prompt_inputs = ["info_input", "info_template"]
-            chain_inputs = {"info_input": info_input, "info_template": info_template}
-            
-            if suggestion:
-                prompt_inputs.append("suggestion")
-                chain_inputs["suggestion"]=suggestion
-
-
-            prompt = PromptTemplate(template=template, input_variables=prompt_inputs)
-
-
-            saving_prompt=prompt.format(**chain_inputs)
-
-                
-
-            llm_chain = LLMChain(
-                prompt=prompt,
-                llm=self.llm
-            )
-            
-
-            response = llm_chain.run(chain_inputs)
-            create_llm_data(prompt=saving_prompt,response=response)
-            suggestion, code = response.split("Code:")
-
-            return {"suggestion":suggestion,"code":code}
-        except Exception as e:
-            print(f"Error suggesting column mapping: {e}")
-            return {"suggestion": "", "code": ""}
-
-
+    def suggest(self, info_input: list[dict], info_template: list[dict], suggestion: str | None = None) -> dict:
+        if suggestion:
+            prompt = revision_template.format(info_input=info_input, info_template=info_template, suggestion=suggestion)
+        else:
+            prompt = main_template.format(info_input=info_input, info_template=info_template)
+        answer = self.client.complete(prompt)
+        if self.store_prompts:
+            create_llm_data(prompt=prompt, response=answer)
+        return parse_answer(answer)
