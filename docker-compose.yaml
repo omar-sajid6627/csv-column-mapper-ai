@@ -1,16 +1,33 @@
-version: '3.8'
-
 services:
-  web:
-    image: <aws-account-id>.dkr.ecr.<region>.amazonaws.com/zero-test:latest
-    ports:
-      - "8000:8000"
+  api:
+    build: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: sqlite:////app/data/llmdatabase.db
     volumes:
-      - data-volume:/app/data
-  frontend:
-    image: <aws-account-id>.dkr.ecr.<region>.amazonaws.com/zero-test-frontend:latest
+      - api-data:/app/data
     ports:
-      - "80:80"
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: ./front_end
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  data-volume:
+  api-data:
