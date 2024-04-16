@@ -18,6 +18,7 @@ from utils import (
     read_csv_upload,
     run_script,
     settings,
+    suggest_mapping,
 )
 
 
@@ -37,10 +38,18 @@ app.add_middleware(
 )
 
 
-def get_suggester() -> ColumnMapper:
-    if not settings.openai_api_key:
-        raise HTTPException(503, "OPENAI_API_KEY is not set")
-    return ColumnMapper(OpenAIClient(settings.openai_api_key, settings.openai_model), settings.store_prompts)
+class DemoSuggester:
+    def suggest(self, info_input, info_template, suggestion=None):
+        return suggest_mapping(info_input, info_template, suggestion)
+
+
+def get_suggester():
+    """Dependency: the model-backed mapper, or the offline matcher in demo mode."""
+    if settings.effective_llm_mode == "openai":
+        if not settings.openai_api_key:
+            raise HTTPException(503, "LLM_MODE=openai but OPENAI_API_KEY is not set")
+        return ColumnMapper(OpenAIClient(settings.openai_api_key, settings.openai_model), settings.store_prompts)
+    return DemoSuggester()
 
 
 def _read(upload: UploadFile):
@@ -55,11 +64,16 @@ def home():
     return {"Message": "Backend is running"}
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok", "llm_mode": settings.effective_llm_mode}
+
+
 @app.post("/suggest_column_mapping/")
 def column_suggestions(
     input_table: Annotated[UploadFile, File()],
     template_table: Annotated[UploadFile, File()],
-    suggester: Annotated[ColumnMapper, Depends(get_suggester)],
+    suggester: Annotated[ColumnMapper | DemoSuggester, Depends(get_suggester)],
     suggestion: Annotated[str | None, Form()] = None,
 ):
     """Suggest how the input CSV's columns map onto the template CSV, plus a
