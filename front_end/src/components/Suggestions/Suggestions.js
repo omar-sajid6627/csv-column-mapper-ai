@@ -1,32 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { TextField } from '@mui/material';
+import { Alert, TextField } from '@mui/material';
 import LoadingButton from '@mui/lab/LoadingButton';
-import { updateSuggestions } from '../../Apis'
+import { errorMessage, updateSuggestions } from '../../Apis';
 import './Suggestions.css';
 
 function Suggestions({ setSuggestions, setCode, inputFile, templateFile, suggestions }) {
   const [editedSuggestions, setEditedSuggestions] = useState(suggestions);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    setEditedSuggestions(suggestions)
-  }, [suggestions])
+    setEditedSuggestions(suggestions);
+  }, [suggestions]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    let formData = new FormData();
+    const formData = new FormData();
     formData.append('input_table', inputFile);
-    formData.append('template_table', templateFile)
-    formData.append('suggestion', JSON.stringify(editedSuggestions))
+    formData.append('template_table', templateFile);
+    formData.append('suggestion', editedSuggestions);
     setLoading(true);
-    updateSuggestions(formData).then(res => {
-      setSuggestions([res.data.suggestion]);
-      setCode(res.data.code);
-      setLoading(false);
-    })
-      .catch(err => {
-        setLoading(false);
+    setError('');
+    updateSuggestions(formData)
+      .then((res) => {
+        setSuggestions(res.data.suggestion);
+        setCode(res.data.code);
       })
+      .catch((err) => setError(errorMessage(err)))
+      .finally(() => setLoading(false));
   };
 
   return (
@@ -34,6 +35,7 @@ function Suggestions({ setSuggestions, setCode, inputFile, templateFile, suggest
       <TextField
         value={editedSuggestions}
         onChange={(e) => setEditedSuggestions(e.target.value)}
+        inputProps={{ 'aria-label': 'Suggested column mapping' }}
         multiline
         rows={10}
         variant="outlined"
@@ -43,10 +45,12 @@ function Suggestions({ setSuggestions, setCode, inputFile, templateFile, suggest
         loading={loading}
         loadingPosition="center"
         variant="contained"
+        disabled={!inputFile || !templateFile || !editedSuggestions}
         onClick={handleSubmit}
       >
         Update Suggestions
       </LoadingButton>
+      {error && <Alert severity="error">{error}</Alert>}
     </div>
   );
 }

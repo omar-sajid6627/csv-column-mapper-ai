@@ -1,38 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { ToastContainer, toast } from 'react-toastify';
-import { TextField } from '@mui/material';
+import { Alert, TextField } from '@mui/material';
 import LoadingButton from '@mui/lab/LoadingButton';
-import { mapCode } from '../../Apis';
-import 'react-toastify/dist/ReactToastify.css';
+import { errorMessage, mapCode } from '../../Apis';
 import './CodeEditor.css';
 
 function CodeEditor({ file, code, setOutputData }) {
   const [editedCode, setEditedCode] = useState(code);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    setEditedCode(code)
-  }, [code])
+    setEditedCode(code);
+  }, [code]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    let formData = new FormData();
+    const formData = new FormData();
     formData.append('input_table', file);
-    formData.append('code', editedCode)
+    formData.append('code', editedCode);
     setLoading(true);
-    mapCode(formData).then(res => {
-      
-        setOutputData(res.data)
-      
-      // if (!res.data.code) {
-      //   const errorData = res.data;
-      //   toast(errorData?.[2], {type: 'error'})
-      // }
-      setLoading(false);
-    })
-      .catch(err => {
-        setLoading(false);
+    setError('');
+    mapCode(formData)
+      .then((res) => setOutputData(res.data))
+      .catch((err) => {
+        setOutputData([]);
+        setError(errorMessage(err));
       })
+      .finally(() => setLoading(false));
   };
 
   return (
@@ -40,6 +34,7 @@ function CodeEditor({ file, code, setOutputData }) {
       <TextField
         value={editedCode}
         onChange={(e) => setEditedCode(e.target.value)}
+        inputProps={{ 'aria-label': 'Mapping script' }}
         multiline
         rows={10}
         variant="outlined"
@@ -49,11 +44,12 @@ function CodeEditor({ file, code, setOutputData }) {
         loading={loading}
         loadingPosition="center"
         variant="contained"
+        disabled={!file || !editedCode}
         onClick={handleSubmit}
       >
         Map
       </LoadingButton>
-      <ToastContainer />
+      {error && <Alert severity="error">{error}</Alert>}
     </div>
   );
 }

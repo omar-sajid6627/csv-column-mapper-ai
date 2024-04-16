@@ -1,48 +1,19 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://0.0.0.0:8000';
+const api = axios.create({
+  baseURL: process.env.REACT_APP_API_URL || '',
+});
 
-export const getCodeAndSuggestions = (formData) => {
-    const res = axios.post(
-        `${BASE_URL}/suggest_column_mapping`,
-        formData,
-        {
-            headers: {
-                "Authorization": "YOUR_API_AUTHORIZATION_KEY_SHOULD_GOES_HERE_IF_HAVE",
-                "Content-type": "multipart/form-data",
-            },
-        }
-    )
+export const getCodeAndSuggestions = (formData) => api.post('/suggest_column_mapping/', formData);
 
-    return res;
-}
+export const updateSuggestions = (formData) => api.post('/suggest_column_mapping/', formData);
 
-export const mapCode = (formData) => {
-    const response = axios.post(
-        `${BASE_URL}/column_mapper`,
-        formData,
-        {
-            headers: {
-                "Authorization": "YOUR_API_AUTHORIZATION_KEY_SHOULD_GOES_HERE_IF_HAVE",
-                "Content-type": "multipart/form-data",
-            },
-        }
-    )
+export const mapCode = (formData) => api.post('/column_mapper/', formData);
 
-    return response;
-}
-
-export const updateSuggestions = (formData) => {
-    const response = axios.post(
-        `${BASE_URL}/suggest_column_mapping`,
-        formData,
-        {
-            headers: {
-                "Authorization": "YOUR_API_AUTHORIZATION_KEY_SHOULD_GOES_HERE_IF_HAVE",
-                "Content-type": "multipart/form-data",
-            },
-        }
-    )
-
-    return response;
-}
+export const errorMessage = (error) => {
+  const data = error?.response?.data;
+  if (typeof data?.detail === 'string') {
+    return data.line ? `Line ${data.line}: ${data.detail}` : data.detail;
+  }
+  return error?.response ? `Request failed (${error.response.status})` : 'Cannot reach the API';
+};

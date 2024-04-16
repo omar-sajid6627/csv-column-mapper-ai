@@ -1,22 +1,11 @@
-import React from "react";
+import React from 'react';
 import './UploadCSV.css';
 
-function UploadCSV({setFile, label}) {
-  const handleOnChange = (e) => {
-    setFile(e.target.files[0]);
-  };
-
+function UploadCSV({ setFile, label, id }) {
   return (
     <div>
-      <form>
-        <label>{label}:  </label>
-        <input
-          type={"file"}
-          id={"csvFileInput"}
-          accept={".csv"}
-          onChange={handleOnChange}
-        />
-      </form>
+      <label htmlFor={id}>{label}: </label>
+      <input type="file" id={id} accept=".csv,text/csv" onChange={(e) => setFile(e.target.files[0] || null)} />
     </div>
   );
 }
