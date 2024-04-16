@@ -71,3 +71,6 @@ coverage/
 logs/
 tmp/
 .github/
+
+# Screenshots of the original UI, kept on disk; current ones are in docs/screenshots/
+/screenshots/
